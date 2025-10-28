@@ -1,9 +1,9 @@
 import { useState } from "react";
 import Papa from "papaparse";
 
-export default function UploadBox() {
+export default function UploadBox({ onDataReady }) {
   const [file, setFile] = useState(null);
-  const [status, setStatus] = useState("idle"); // idle | validating | valid | error
+  const [status, setStatus] = useState("idle"); // idle | validating | uploading | done | error
   const [message, setMessage] = useState("");
   const [rowCount, setRowCount] = useState(0);
 
@@ -11,6 +11,11 @@ export default function UploadBox() {
   const MAX_SIZE_MB = 10;
   const MAX_ROWS = 10000;
 
+  const API_URL = "https://d3ezhigaqa.execute-api.eu-central-1.amazonaws.com/prod/predict";
+
+  // ───────────────────────────────
+  // 1️⃣ Main file handler
+  // ───────────────────────────────
   function handleFileChange(e) {
     const uploaded = e.target.files[0];
     if (!uploaded) return;
@@ -81,8 +86,9 @@ export default function UploadBox() {
         }
 
         // ✅ Passed all frontend checks
-        setStatus("valid");
-        setMessage(`✅ File "${uploaded.name}" passed validation. Ready to upload.`);
+        setStatus("uploading");
+        setMessage("Uploading and processing file...");
+        uploadToAPI(uploaded);
       },
       error: (err) => {
         setStatus("error");
@@ -91,6 +97,52 @@ export default function UploadBox() {
     });
   }
 
+  // ───────────────────────────────
+  // 2️⃣ Upload to AWS API Gateway
+  // ───────────────────────────────
+  function uploadToAPI(uploaded) {
+    const reader = new FileReader();
+
+    reader.onload = async (event) => {
+      const base64data = event.target.result.split(",")[1]; // remove data: prefix
+
+      try {
+        const response = await fetch(API_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            isBase64Encoded: true,
+            body: base64data,
+          }),
+        });
+
+        if (!response.ok) throw new Error(`HTTP error! ${response.status}`);
+
+        const data = await response.json();
+
+        if (data.error) {
+          setStatus("error");
+          setMessage(`❌ Backend error: ${data.error}`);
+          return;
+        }
+
+        // Success: backend returned prediction JSON
+        console.log("Predictions:", data);
+        setStatus("done");
+        setMessage(`✅ Processed successfully. Received ${data.length} predictions.`);
+        onDataReady(data); // send data up to parent
+      } catch (err) {
+        setStatus("error");
+        setMessage(`❌ Upload failed: ${err.message}`);
+      }
+    };
+
+    reader.readAsDataURL(uploaded);
+  }
+
+  // ───────────────────────────────
+  // 3️⃣ Reset state
+  // ───────────────────────────────
   function reset() {
     setFile(null);
     setStatus("idle");
@@ -98,6 +150,9 @@ export default function UploadBox() {
     setRowCount(0);
   }
 
+  // ───────────────────────────────
+  // 4️⃣ UI rendering
+  // ───────────────────────────────
   return (
     <div className="border-2 border-dashed border-green-600 rounded-lg p-8 text-center transition hover:bg-green-50">
       {status === "idle" && (
@@ -119,26 +174,26 @@ export default function UploadBox() {
         </>
       )}
 
-      {status === "validating" && (
+      {status === "validating" || status === "uploading" ? (
         <div className="flex flex-col items-center justify-center space-y-3">
           <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-green-600"></div>
           <p className="text-gray-700">{message}</p>
         </div>
-      )}
+      ) : null}
 
-      {(status === "valid" || status === "error") && (
+      {(status === "done" || status === "error") && (
         <div className="text-gray-700 animate-fadeIn">
           <p className={`font-medium ${status === "error" ? "text-red-600" : "text-green-700"}`}>
             {message}
           </p>
-          {status === "valid" && (
-            <p className="text-sm text-gray-500 mt-2">{rowCount} Zeilen erkannt</p>
+          {status === "done" && (
+            <p className="text-sm text-gray-500 mt-2">{rowCount} rows processed</p>
           )}
           <button
             onClick={reset}
             className="mt-4 text-sm text-red-600 underline hover:text-red-800"
           >
-            Neue Datei hochladen
+            Upload another file
           </button>
         </div>
       )}

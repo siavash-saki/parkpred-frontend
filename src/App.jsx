@@ -1,10 +1,14 @@
-import Header from './components/Header'
-import UploadBox from './components/UploadBox'
-import MapViewer from './components/MapViewer'
+import { useState } from "react";
+import Header from "./components/Header";
+import UploadBox from "./components/UploadBox";
+import MapViewer from "./components/MapViewer";
 import HowItWorks from "./components/HowItWorks";
-import Footer from './components/Footer'
+import Footer from "./components/Footer";
 
 function App() {
+  // Shared state for predictions returned from backend
+  const [mapData, setMapData] = useState(null);
+
   return (
     <div className="flex flex-col min-h-screen">
       <Header />
@@ -17,18 +21,29 @@ function App() {
           <p className="text-gray-600 text-center mb-12">
             Upload your CSV file, analyze parking search behavior, and visualize the results on an interactive map.
           </p>
+
+          {/* Info accordion */}
           <HowItWorks />
-          <UploadBox />
+
+          {/* Upload box passes predictions to parent */}
+          <UploadBox onDataReady={(data) => setMapData(data)} />
         </section>
 
+        {/* Map viewer only renders when data exists */}
         <section>
-          <MapViewer />
+          {mapData ? (
+            <MapViewer data={mapData} />
+          ) : (
+            <div className="text-center text-gray-500 italic">
+              No data yet – upload a file to see predictions on the map.
+            </div>
+          )}
         </section>
       </main>
 
       <Footer />
     </div>
-  )
+  );
 }
 
-export default App
+export default App;
