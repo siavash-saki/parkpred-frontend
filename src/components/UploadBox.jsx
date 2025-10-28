@@ -114,7 +114,28 @@ export default function UploadBox({ onDataReady }) {
   }
 
   // ───────────────────────────────
-  // 3️⃣ UI rendering
+  // 3️⃣ Load and process GitHub sample file
+  // ───────────────────────────────
+  async function handleSampleFile(url) {
+    try {
+      setStatus("uploading");
+      setMessage("Loading sample data...");
+
+      const response = await fetch(url);
+      if (!response.ok) throw new Error("Failed to fetch sample file.");
+
+      const csvText = await response.text();
+      const blob = new Blob([csvText], { type: "text/csv" });
+
+      uploadToAPI(blob);
+    } catch (err) {
+      setStatus("error");
+      setMessage(`❌ Failed to load sample: ${err.message}`);
+    }
+  }
+
+  // ───────────────────────────────
+  // 4️⃣ UI rendering
   // ───────────────────────────────
   return (
     <div className="border-2 border-dashed border-green-600 rounded-lg p-8 text-center transition hover:bg-green-50">
@@ -160,6 +181,42 @@ export default function UploadBox({ onDataReady }) {
           </button>
         </div>
       )}
+
+      {/* ─────────────────────────────── */}
+      {/* 5️⃣ Example samples section */}
+      {/* ─────────────────────────────── */}
+      <hr className="my-6 border-gray-200 w-3/4 mx-auto" />
+
+      <div className="mt-4 text-sm text-gray-600 text-center">
+        <p className="mb-2 font-medium text-gray-700">
+          Don’t have your own data? Try one of these sample trips:
+        </p>
+
+        <div className="flex flex-wrap gap-3 justify-center">
+          {[
+            {
+              name: "Trajectory 1",
+              file: "https://raw.githubusercontent.com/ReLUT/parking-search-prediction/main/examples/trajectory_1.csv",
+            },
+            {
+              name: "Trajectory 2",
+              file: "https://raw.githubusercontent.com/ReLUT/parking-search-prediction/main/examples/trajectory_2.csv",
+            },
+            {
+              name: "Trajectory 3",
+              file: "https://raw.githubusercontent.com/ReLUT/parking-search-prediction/main/examples/trajectory_3.csv",
+            },
+          ].map((s, i) => (
+            <button
+              key={i}
+              onClick={() => handleSampleFile(s.file)}
+              className="bg-green-50 text-green-700 border border-green-200 px-3 py-1.5 rounded-md hover:bg-green-200 transition"
+            >
+              {s.name}
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
